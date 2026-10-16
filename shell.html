@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Retro Snake</title>
+  <style>
+    /* lightGreen = {173, 204, 96} = #adcc60, darkGreen = {43, 51, 24} = #2b3318 */
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #adcc60;
+      font-family: sans-serif;
+    }
+
+    /* Center the game in the middle of the page */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* Keep the canvas square and as big as fits, whatever the window size */
+    canvas {
+      display: block;
+      width: min(100vw, 100vh);
+      height: min(100vw, 100vh);
+      outline: none;
+    }
+
+    /* "Click to play" screen. The click is what lets the browser play sound. */
+    #start {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #adcc60;
+      color: #2b3318;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    #start h1 { margin: 0; font-size: min(10vw, 56px); }
+    #start p  { margin: 0; font-size: min(5vw, 22px); }
+    #start .play {
+      margin-top: 12px;
+      padding: 12px 28px;
+      border-radius: 12px;
+      background: #2b3318;
+      color: #adcc60;
+      font-size: min(6vw, 26px);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+  <div id="start">
+    <h1>Retro Snake</h1>
+    <p>Arrow keys to steer</p>
+    <div class="play">Click to play</div>
+  </div>
+
+  <script>
+    var Module = {
+      canvas: document.getElementById('canvas')
+    };
+
+    // Stop the arrow keys from scrolling the page
+    window.addEventListener('keydown', function (e) {
+      var keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '];
+      if (keys.indexOf(e.key) > -1) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // The game (and its audio) only starts AFTER the player clicks.
+    // Browsers only allow sound after a click, so this makes the music work.
+    document.getElementById('start').addEventListener('click', function () {
+      this.style.display = 'none';
+
+      var script = document.createElement('script');
+      script.src = 'index.js';
+      document.body.appendChild(script);
+
+      document.getElementById('canvas').focus();
+    });
+  </script>
+
+  <!-- The build tool needs this exact line; the game script is started by the click above. -->
+  <!-- {{{ SCRIPT }}} -->
+</body>
+</html>

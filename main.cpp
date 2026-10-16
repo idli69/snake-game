@@ -1,3 +1,6 @@
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/emscripten.h>
+#endif
 #include <deque>
 #include <raylib.h>
 #include <raymath.h>
@@ -5,21 +8,21 @@
 using namespace std;
 
 // Deque is used for smooth snake head and tail mechanism.
-// This Data Structure is like an array but i can add and remove from front and
-// back easily.
+// This data structure is like an array but I can add and remove from the front
+// and back easily.
 
-// green color for the snake.
-Color green = {173, 204, 96, 255};
-Color darkGreen = {43, 51, 24, 255};
+// Colors used in the game.
+Color lightGreen = {173, 204, 96, 255}; // background
+Color darkGreen = {43, 51, 24, 255};    // snake body, border, text
 Color headColor = {200, 90, 40, 255};
 
 // The game ground is divided into cells. 25 * 25
 const int cellCount = 25;
 const float marginCells = 1.5f;
-const float screenUse = 0.8f;
+const float screenHeightFraction = 0.8f;
 
 int cellSize;
-int offSet;
+int margin;
 
 // to store the last time Update() function ran.
 double lastUpdateTime = 0;
@@ -51,7 +54,7 @@ bool ElementInDeque(Vector2 element, const deque<Vector2>& body)
     }
     return false;
 }
-// Class that handles all the functionalities of the Snake enitiy.
+// Class that handles all the functionalities of the Snake entity.
 class Snake
 {
 public:
@@ -76,7 +79,7 @@ public:
 
             // Defines the snake body parts as rectangle and makes it rounded.
             Rectangle segment = {
-                (offSet + cellSize * x), (offSet + cellSize * y), (float)cellSize, (float)cellSize};
+                (margin + cellSize * x), (margin + cellSize * y), (float)cellSize, (float)cellSize};
             DrawRectangleRounded(segment, 0.6, 6, color);
         }
     }
@@ -110,7 +113,7 @@ public:
 
     Food(const deque<Vector2>& snakeBody)
     {
-        // loading the appleimage to a Texture.
+        // loading the apple image to a Texture.
         Image image = LoadImage("./assets/apple.png");
         ImageResize(&image, cellSize, cellSize);
         texture = LoadTextureFromImage(image);
@@ -128,7 +131,7 @@ public:
 
     void Draw()
     {
-        DrawTexture(texture, offSet + position.x * cellSize, offSet + position.y * cellSize, WHITE);
+        DrawTexture(texture, margin + position.x * cellSize, margin + position.y * cellSize, WHITE);
     };
 
     Vector2 GenerateRandomCell()
@@ -141,12 +144,12 @@ public:
     // Function to generate a random (x,y) vector.
     Vector2 GenerateRandomPos(const deque<Vector2>& snakeBody)
     {
-        Vector2 position = GenerateRandomCell();
-        while (ElementInDeque(position, snakeBody))
+        Vector2 candidate = GenerateRandomCell();
+        while (ElementInDeque(candidate, snakeBody))
         {
-            position = GenerateRandomCell();
+            candidate = GenerateRandomCell();
         }
-        return position;
+        return candidate;
     };
 };
 
@@ -179,6 +182,7 @@ public:
     {
         UnloadSound(eatSound);
         UnloadSound(wallSound);
+        UnloadMusicStream(music);
         CloseAudioDevice();
     }
 
@@ -201,7 +205,7 @@ public:
         {
             snake.Update();
             CheckCollisionWithFood();
-            CheckCollisionWithScreedEdges();
+            CheckCollisionWithEdges();
             CheckCollisionWithTail();
         }
     }
@@ -223,7 +227,7 @@ public:
         }
     }
 
-    void CheckCollisionWithScreedEdges()
+    void CheckCollisionWithEdges()
     {
         if (snake.body[0].x == cellCount || snake.body[0].x == -1)
             GameOver();
@@ -254,121 +258,150 @@ public:
 
 void SetupWindow()
 {
+#if defined(__EMSCRIPTEN__)
+    cellSize = 24;
+    margin = cellSize * 3 / 2;
+    int windowSize = 2 * margin + cellSize * cellCount;
+    InitWindow(windowSize, windowSize, "Retro Snake Game");
+#else
     InitWindow(400, 400, "Retro Snake Game");
 
     int monitor = GetCurrentMonitor();
     int screenWidth = GetMonitorWidth(monitor);
     int screenHeight = GetMonitorHeight(monitor);
 
-    int maxWindowSize = (int)(screenHeight * screenUse);
+    int maxWindowSize = (int)(screenHeight * screenHeightFraction);
     cellSize = (int)(maxWindowSize / (cellCount + 2 * marginCells));
-    offSet = (int)(cellSize * marginCells);
+    margin = (int)(cellSize * marginCells);
 
-    int windowSize = 2 * offSet + cellSize * cellCount;
+    int windowSize = 2 * margin + cellSize * cellCount;
     SetWindowSize(windowSize, windowSize);
     SetWindowPosition((screenWidth - windowSize) / 2, (screenHeight - windowSize) / 2);
+#endif
+}
+
+// Pointer to the game. It is created in main() after the window exists.
+Game* game = nullptr;
+
+// One frame of the game: input, update, draw.
+// On desktop main() calls this in a while loop.
+// On the web the browser calls it once per frame.
+void UpdateDrawFrame()
+{
+    UpdateMusicStream(game->music);
+    // 1. INPUT
+    if (IsKeyPressed(KEY_UP) && game->snake.direction.y != 1)
+    {
+        game->snake.nextDirection = {0, -1};
+        game->Start();
+    };
+    if (IsKeyPressed(KEY_DOWN) && game->snake.direction.y != -1)
+    {
+        game->snake.nextDirection = {0, 1};
+        game->Start();
+    };
+    if (IsKeyPressed(KEY_LEFT) && game->snake.direction.x != 1)
+    {
+        game->snake.nextDirection = {-1, 0};
+        game->Start();
+    };
+    if (IsKeyPressed(KEY_RIGHT) && game->snake.direction.x != -1)
+    {
+        game->snake.nextDirection = {1, 0};
+        game->Start();
+    };
+
+    // 2. UPDATE
+    if (eventTriggered(0.3))
+    {
+        game->Update();
+    }
+
+    // 3. DRAW
+    BeginDrawing();
+
+    float borderThickness = cellSize / 5.0f;
+    float boardSize = (float)cellSize * cellCount;
+    int fontSize = cellSize;
+
+    ClearBackground(lightGreen);
+    DrawRectangleLinesEx(Rectangle{margin - borderThickness,
+                                   margin - borderThickness,
+                                   boardSize + 2 * borderThickness,
+                                   boardSize + 2 * borderThickness},
+                         borderThickness,
+                         darkGreen);
+
+    DrawText("Retro Snake",
+             (int)(margin - borderThickness),
+             (margin - fontSize) / 2,
+             fontSize,
+             darkGreen);
+
+    const char* scoreText = TextFormat("Score : %i", game->score);
+    int scoreWidth = MeasureText(scoreText, fontSize);
+    DrawText(scoreText,
+             (int)(margin + boardSize + borderThickness - scoreWidth),
+             (margin - fontSize) / 2,
+             fontSize,
+             darkGreen);
+    DrawText(TextFormat("High Score : %i", game->highScore),
+             (int)(margin - borderThickness),
+             (int)(margin + boardSize + borderThickness * 2),
+             fontSize,
+             darkGreen);
+
+    game->Draw();
+
+    if (game->running == false)
+    {
+        DrawRectangle(margin, margin, (int)boardSize, (int)boardSize, Fade(darkGreen, 0.6f));
+
+        int bigFontSize = fontSize * 2;
+        int gameOverWidth = MeasureText("Game Over", bigFontSize);
+        int hintWidth = MeasureText("Press an arrow key", fontSize);
+        int centerX = margin + (int)(boardSize / 2);
+        int centerY = margin + (int)(boardSize / 2);
+
+        DrawText("Game Over",
+                 centerX - gameOverWidth / 2,
+                 centerY - bigFontSize,
+                 bigFontSize,
+                 lightGreen);
+        DrawText("Press an arrow key",
+                 centerX - hintWidth / 2,
+                 centerY + fontSize / 2,
+                 fontSize,
+                 lightGreen);
+    }
+
+    EndDrawing();
 }
 
 int main()
 {
+    // The web version has no real folders to change to, so only do this on desktop.
+#if !defined(__EMSCRIPTEN__)
     ChangeDirectory(GetApplicationDirectory());
+#endif
 
     SetupWindow();
     SetTargetFPS(60);
 
+    game = new Game();
+
+#if defined(__EMSCRIPTEN__)
+    // The browser calls UpdateDrawFrame once per frame. This never returns.
+    emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
+#else
+    while (WindowShouldClose() == false)
     {
-        Game game = Game();
-
-        while (WindowShouldClose() == false)
-        {
-
-            // INPUT
-            if (IsKeyPressed(KEY_UP) && game.snake.direction.y != 1)
-            {
-                game.snake.nextDirection = {0, -1};
-                game.Start();
-            };
-            if (IsKeyPressed(KEY_DOWN) && game.snake.direction.y != -1)
-            {
-                game.snake.nextDirection = {0, 1};
-                game.Start();
-            };
-            if (IsKeyPressed(KEY_LEFT) && game.snake.direction.x != 1)
-            {
-                game.snake.nextDirection = {-1, 0};
-                game.Start();
-            };
-            if (IsKeyPressed(KEY_RIGHT) && game.snake.direction.x != -1)
-            {
-                game.snake.nextDirection = {1, 0};
-                game.Start();
-            };
-
-            // UPDATE
-            if (eventTriggered(0.3))
-            {
-                game.Update();
-            }
-
-            // DRAW
-            BeginDrawing();
-
-            float border = cellSize / 5.0f;
-            float boardSize = (float)cellSize * cellCount;
-            int fontSize = cellSize;
-
-            ClearBackground(green);
-            DrawRectangleLinesEx(Rectangle{offSet - border,
-                                           offSet - border,
-                                           boardSize + 2 * border,
-                                           boardSize + 2 * border},
-                                 border,
-                                 darkGreen);
-
-            DrawText("Retro Snake",
-                     (int)(offSet - border),
-                     (offSet - fontSize) / 2,
-                     fontSize,
-                     darkGreen);
-
-            const char* scoreText = TextFormat("Score : %i", game.score);
-            int scoreWidth = MeasureText(scoreText, fontSize);
-            DrawText(scoreText,
-                     (int)(offSet + boardSize + border - scoreWidth),
-                     (offSet - fontSize) / 2,
-                     fontSize,
-                     darkGreen);
-            DrawText(TextFormat("High Score : %i", game.highScore),
-                     (int)(offSet - border),
-                     (int)(offSet + boardSize + border * 2),
-                     fontSize,
-                     darkGreen);
-
-            game.Draw();
-
-            if (game.running == false)
-            {
-                DrawRectangle(
-                    offSet, offSet, (int)boardSize, (int)boardSize, Fade(darkGreen, 0.6f));
-
-                int bigSize = fontSize * 2;
-                int w1 = MeasureText("Game Over", bigSize);
-                int w2 = MeasureText("Press an arrow key", fontSize);
-                int centerX = offSet + (int)(boardSize / 2);
-                int centerY = offSet + (int)(boardSize / 2);
-
-                DrawText("Game Over", centerX - w1 / 2, centerY - bigSize, bigSize, green);
-                DrawText("Press an arrow key",
-                         centerX - w2 / 2,
-                         centerY + fontSize / 2,
-                         fontSize,
-                         green);
-            }
-
-            EndDrawing();
-        }
+        UpdateDrawFrame();
     }
+#endif
 
+    // Destroy the game BEFORE closing the window.
+    delete game;
     CloseWindow();
     return 0;
 }

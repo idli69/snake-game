@@ -3,3 +3,5 @@ snake.exe
 *.o
 *.zip
 RetroSnake-Linux/
+main_desktop_backup.cpp
+web/
