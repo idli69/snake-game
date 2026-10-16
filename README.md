@@ -44,7 +44,3 @@ Then run it from the project folder so the `assets` folder is found.
 - Made by: Idli
 - Built with [raylib](https://www.raylib.com/) (zlib license)
 - Art and sounds: [Pixabay](https://pixabay.com/sound-effects/)
-
-## License
-
-`[choose one, for example MIT, or write "All rights reserved"]`
