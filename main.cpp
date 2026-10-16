@@ -162,12 +162,18 @@ public:
 
     Sound eatSound;
     Sound wallSound;
+    Music music;
 
     Game()
     {
         InitAudioDevice();
         eatSound = LoadSound("./assets/sounds/eat.mp3");
         wallSound = LoadSound("./assets/sounds/wall.mp3");
+
+        music = LoadMusicStream("./assets/sounds/snake.mp3");
+        music.looping = true;
+        SetMusicVolume(music, 0.4f);
+        PlayMusicStream(music);
     }
     ~Game()
     {
@@ -265,6 +271,7 @@ void SetupWindow()
 
 int main()
 {
+    ChangeDirectory(GetApplicationDirectory());
 
     SetupWindow();
     SetTargetFPS(60);
